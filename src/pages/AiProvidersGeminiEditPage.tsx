@@ -21,7 +21,7 @@ import type { GeminiFormState } from '@/components/providers';
 import layoutStyles from './AiProvidersEditLayout.module.scss';
 import styles from './AiProvidersPage.module.scss';
 
-type LocationState = { fromAiProviders?: boolean; keyOnly?: boolean; groupIndices?: number[] } | null;
+type LocationState = { fromAiProviders?: boolean; keyOnly?: boolean; groupIndices?: number[]; referenceIndex?: number } | null;
 
 const buildEmptyForm = (): GeminiFormState => ({
   apiKey: '',
@@ -103,6 +103,7 @@ export function AiProvidersGeminiEditPage() {
 
   const locationState = location.state as LocationState;
   const keyOnly = Boolean(locationState?.keyOnly);
+  const referenceIndex = typeof locationState?.referenceIndex === 'number' ? locationState.referenceIndex : null;
   const groupIndices: number[] =
     Array.isArray(locationState?.groupIndices) && locationState.groupIndices!.length > 0
       ? locationState.groupIndices!
@@ -196,7 +197,22 @@ export function AiProvidersGeminiEditPage() {
       setBaselineSignature(buildGeminiSignature(nextForm));
       return;
     }
-    const nextForm = buildEmptyForm();
+    const refData = keyOnly && referenceIndex !== null ? configs[referenceIndex] : undefined;
+    const emptyForm = buildEmptyForm();
+    const nextForm: GeminiFormState = refData
+      ? {
+          ...emptyForm,
+          baseUrl: refData.baseUrl,
+          proxyUrl: refData.proxyUrl,
+          headers: headersToEntries(refData.headers),
+          modelEntries: modelsToEntries(refData.models).map((entry) => ({
+            ...entry,
+            name: stripGeminiModelResourceName(entry.name),
+          })),
+          excludedModels: refData.excludedModels,
+          excludedText: excludedModelsToText(refData.excludedModels),
+        }
+      : emptyForm;
     setForm(nextForm);
     setBaselineSignature(buildGeminiSignature(nextForm));
   }, [initialData, loading]);

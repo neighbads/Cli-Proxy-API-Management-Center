@@ -12,7 +12,7 @@ import { buildHeaderObject, headersToEntries, normalizeHeaderEntries } from '@/u
 import { excludedModelsToText, parseExcludedModels } from '@/components/providers/utils';
 import { modelsToEntries } from '@/components/ui/modelInputListUtils';
 
-type LocationState = { fromAiProviders?: boolean; groupIndices?: number[]; keyOnly?: boolean } | null;
+type LocationState = { fromAiProviders?: boolean; groupIndices?: number[]; keyOnly?: boolean; referenceIndex?: number } | null;
 
 type TestStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -126,6 +126,7 @@ export function AiProvidersClaudeEditLayout() {
     [isGroupEdit, locationState?.groupIndices]
   );
   const keyOnly = Boolean(locationState?.keyOnly);
+  const referenceIndex = typeof locationState?.referenceIndex === 'number' ? locationState.referenceIndex : null;
 
   const hasIndexParam = typeof params.index === 'string' && !isGroupEdit;
   const editIndex = useMemo(
@@ -277,10 +278,24 @@ export function AiProvidersClaudeEditLayout() {
       return;
     }
 
+    const refData = keyOnly && referenceIndex !== null ? configs[referenceIndex] : undefined;
     const emptyForm = buildEmptyForm();
+    const seededForm: ProviderFormState = refData
+      ? {
+          ...emptyForm,
+          baseUrl: refData.baseUrl,
+          proxyUrl: refData.proxyUrl,
+          headers: headersToEntries(refData.headers),
+          models: refData.models,
+          modelEntries: modelsToEntries(refData.models),
+          excludedModels: refData.excludedModels,
+          excludedText: excludedModelsToText(refData.excludedModels),
+          cloak: refData.cloak,
+        }
+      : emptyForm;
     initDraft(draftKey, {
-      baselineSignature: buildClaudeSignature(emptyForm),
-      form: emptyForm,
+      baselineSignature: buildClaudeSignature(seededForm),
+      form: seededForm,
       testModel: '',
       testStatus: 'idle',
       testMessage: '',

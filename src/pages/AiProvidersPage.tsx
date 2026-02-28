@@ -363,9 +363,9 @@ export function AiProvidersPage() {
             disableControls={disableControls}
             isSwitching={isSwitching}
             onAdd={() => openEditor('/ai-providers/gemini/new')}
-            onAddInGroup={() =>
+            onAddInGroup={(refIndex) =>
               navigate('/ai-providers/gemini/new', {
-                state: { fromAiProviders: true, keyOnly: true },
+                state: { fromAiProviders: true, keyOnly: true, referenceIndex: refIndex },
               })
             }
             onEditGroup={(groupIndices) =>
@@ -393,9 +393,9 @@ export function AiProvidersPage() {
             isSwitching={isSwitching}
             resolvedTheme={resolvedTheme}
             onAdd={() => openEditor('/ai-providers/codex/new')}
-            onAddInGroup={() =>
+            onAddInGroup={(refIndex) =>
               navigate('/ai-providers/codex/new', {
-                state: { fromAiProviders: true, keyOnly: true },
+                state: { fromAiProviders: true, keyOnly: true, referenceIndex: refIndex },
               })
             }
             onEditGroup={(groupIndices) =>
@@ -423,9 +423,9 @@ export function AiProvidersPage() {
             isSwitching={isSwitching}
             onAdd={() => openEditor('/ai-providers/claude/new')}
             onEdit={(index) => openEditor(`/ai-providers/claude/${index}`)}
-            onAddInGroup={() =>
+            onAddInGroup={(refIndex) =>
               navigate('/ai-providers/claude/new', {
-                state: { fromAiProviders: true, keyOnly: true },
+                state: { fromAiProviders: true, keyOnly: true, referenceIndex: refIndex },
               })
             }
             onEditKey={(index) =>
@@ -452,9 +452,9 @@ export function AiProvidersPage() {
             disableControls={disableControls}
             isSwitching={isSwitching}
             onAdd={() => openEditor('/ai-providers/vertex/new')}
-            onAddInGroup={() =>
+            onAddInGroup={(refIndex) =>
               navigate('/ai-providers/vertex/new', {
-                state: { fromAiProviders: true, keyOnly: true },
+                state: { fromAiProviders: true, keyOnly: true, referenceIndex: refIndex },
               })
             }
             onEditGroup={(groupIndices) =>

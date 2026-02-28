@@ -22,7 +22,7 @@ import type { ModelInfo } from '@/utils/models';
 import layoutStyles from './AiProvidersEditLayout.module.scss';
 import styles from './AiProvidersPage.module.scss';
 
-type LocationState = { fromAiProviders?: boolean; keyOnly?: boolean; groupIndices?: number[] } | null;
+type LocationState = { fromAiProviders?: boolean; keyOnly?: boolean; groupIndices?: number[]; referenceIndex?: number } | null;
 
 const buildEmptyForm = (): ProviderFormState => ({
   apiKey: '',
@@ -109,6 +109,7 @@ export function AiProvidersCodexEditPage() {
 
   const locationState = location.state as LocationState;
   const keyOnly = Boolean(locationState?.keyOnly);
+  const referenceIndex = typeof locationState?.referenceIndex === 'number' ? locationState.referenceIndex : null;
   const groupIndices: number[] =
     Array.isArray(locationState?.groupIndices) && locationState.groupIndices!.length > 0
       ? locationState.groupIndices!
@@ -199,7 +200,21 @@ export function AiProvidersCodexEditPage() {
       setBaselineSignature(buildCodexSignature(nextForm));
       return;
     }
-    const nextForm = buildEmptyForm();
+    const refData = keyOnly && referenceIndex !== null ? configs[referenceIndex] : undefined;
+    const emptyForm = buildEmptyForm();
+    const nextForm: ProviderFormState = refData
+      ? {
+          ...emptyForm,
+          baseUrl: refData.baseUrl,
+          websockets: Boolean(refData.websockets),
+          proxyUrl: refData.proxyUrl,
+          headers: headersToEntries(refData.headers),
+          models: refData.models,
+          modelEntries: modelsToEntries(refData.models),
+          excludedModels: refData.excludedModels,
+          excludedText: excludedModelsToText(refData.excludedModels),
+        }
+      : emptyForm;
     setForm(nextForm);
     setBaselineSignature(buildCodexSignature(nextForm));
   }, [initialData, loading]);

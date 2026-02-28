@@ -23,7 +23,7 @@ interface ClaudeSectionProps {
   onEdit: (index: number) => void;
   onEditKey?: (index: number) => void;
    // optional: add new child config under this provider
-  onAddInGroup?: () => void;
+  onAddInGroup?: (referenceIndex: number) => void;
   onEditGroup?: (groupIndices: number[]) => void;
   onDelete: (index: number) => void;
   onToggle: (index: number | number[], enabled: boolean) => void;
@@ -170,7 +170,7 @@ export function ClaudeSection({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={onAddInGroup}
+                                    onClick={() => onAddInGroup(groupIndices[0])}
                                     disabled={actionsDisabled}
                                   >
                                     {t('ai_providers.group_add_button', {

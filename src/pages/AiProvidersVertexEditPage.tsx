@@ -17,7 +17,7 @@ import { buildHeaderObject, headersToEntries, normalizeHeaderEntries } from '@/u
 import type { VertexFormState } from '@/components/providers';
 import layoutStyles from './AiProvidersEditLayout.module.scss';
 
-type LocationState = { fromAiProviders?: boolean; keyOnly?: boolean; groupIndices?: number[] } | null;
+type LocationState = { fromAiProviders?: boolean; keyOnly?: boolean; groupIndices?: number[]; referenceIndex?: number } | null;
 
 const buildEmptyForm = (): VertexFormState => ({
   apiKey: '',
@@ -79,6 +79,7 @@ export function AiProvidersVertexEditPage() {
 
   const locationState = location.state as LocationState;
   const keyOnly = Boolean(locationState?.keyOnly);
+  const referenceIndex = typeof locationState?.referenceIndex === 'number' ? locationState.referenceIndex : null;
   const groupIndices: number[] =
     Array.isArray(locationState?.groupIndices) && locationState.groupIndices!.length > 0
       ? locationState.groupIndices!
@@ -175,7 +176,18 @@ export function AiProvidersVertexEditPage() {
       setBaselineSignature(buildVertexSignature(nextForm));
       return;
     }
-    const nextForm = buildEmptyForm();
+    const refData = keyOnly && referenceIndex !== null ? configs[referenceIndex] : undefined;
+    const emptyForm = buildEmptyForm();
+    const nextForm: VertexFormState = refData
+      ? {
+          ...emptyForm,
+          baseUrl: refData.baseUrl,
+          proxyUrl: refData.proxyUrl,
+          headers: headersToEntries(refData.headers),
+          models: refData.models,
+          modelEntries: modelsToEntries(refData.models),
+        }
+      : emptyForm;
     setForm(nextForm);
     setBaselineSignature(buildVertexSignature(nextForm));
   }, [initialData, loading]);

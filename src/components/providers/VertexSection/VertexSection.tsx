@@ -19,7 +19,7 @@ interface VertexSectionProps {
   disableControls: boolean;
   isSwitching: boolean;
   onAdd: () => void;
-  onAddInGroup?: () => void;
+  onAddInGroup?: (referenceIndex: number) => void;
   onEditGroup?: (groupIndices: number[]) => void;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
@@ -156,7 +156,7 @@ export function VertexSection({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={onAddInGroup}
+                                  onClick={() => onAddInGroup(group.items[0].index)}
                                   disabled={actionsDisabled}
                                 >
                                   {t('ai_providers.group_add_button', { defaultValue: 'Add' })}

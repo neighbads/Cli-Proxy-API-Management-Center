@@ -22,7 +22,7 @@ interface CodexSectionProps {
   isSwitching: boolean;
   resolvedTheme: string;
   onAdd: () => void;
-  onAddInGroup?: () => void;
+  onAddInGroup?: (referenceIndex: number) => void;
   onEditGroup?: (groupIndices: number[]) => void;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
@@ -174,7 +174,7 @@ export function CodexSection({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={onAddInGroup}
+                                    onClick={() => onAddInGroup(groupIndices[0])}
                                     disabled={actionsDisabled}
                                   >
                                     {t('ai_providers.group_add_button', { defaultValue: 'Add' })}
