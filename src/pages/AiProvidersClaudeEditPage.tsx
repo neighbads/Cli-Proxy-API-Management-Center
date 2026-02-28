@@ -343,252 +343,256 @@ export function AiProvidersClaudeEditPage() {
                 />
               </>
             )}
-            <Input
-              label={t('ai_providers.claude_add_modal_url_label')}
-              value={form.baseUrl ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
-              disabled={saving || disableControls || isTesting || keyOnly}
-            />
-            <Input
-              label={t('ai_providers.claude_add_modal_proxy_label')}
-              value={form.proxyUrl ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, proxyUrl: e.target.value }))}
-              disabled={saving || disableControls || isTesting || keyOnly}
-            />
-            <HeaderInputList
-              entries={form.headers}
-              onChange={(entries) => setForm((prev) => ({ ...prev, headers: entries }))}
-              addLabel={t('common.custom_headers_add')}
-              keyPlaceholder={t('common.custom_headers_key_placeholder')}
-              valuePlaceholder={t('common.custom_headers_value_placeholder')}
-              removeButtonTitle={t('common.delete')}
-              removeButtonAriaLabel={t('common.delete')}
-              disabled={saving || disableControls || isTesting || keyOnly}
-            />
+            {!keyOnly && (
+              <>
+                <Input
+                  label={t('ai_providers.claude_add_modal_url_label')}
+                  value={form.baseUrl ?? ''}
+                  onChange={(e) => setForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                  disabled={saving || disableControls || isTesting}
+                />
+                <Input
+                  label={t('ai_providers.claude_add_modal_proxy_label')}
+                  value={form.proxyUrl ?? ''}
+                  onChange={(e) => setForm((prev) => ({ ...prev, proxyUrl: e.target.value }))}
+                  disabled={saving || disableControls || isTesting}
+                />
+                <HeaderInputList
+                  entries={form.headers}
+                  onChange={(entries) => setForm((prev) => ({ ...prev, headers: entries }))}
+                  addLabel={t('common.custom_headers_add')}
+                  keyPlaceholder={t('common.custom_headers_key_placeholder')}
+                  valuePlaceholder={t('common.custom_headers_value_placeholder')}
+                  removeButtonTitle={t('common.delete')}
+                  removeButtonAriaLabel={t('common.delete')}
+                  disabled={saving || disableControls || isTesting}
+                />
 
-            <div className={styles.modelConfigSection}>
-              <div className={styles.modelConfigHeader}>
-                <label className={styles.modelConfigTitle}>{t('ai_providers.claude_models_label')}</label>
-                <div className={styles.modelConfigToolbar}>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        modelEntries: [...prev.modelEntries, { name: '', alias: '' }],
-                      }))
-                    }
-                    disabled={saving || disableControls || isTesting || keyOnly}
-                  >
-                    {t('ai_providers.claude_models_add_btn')}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={openClaudeModelDiscovery}
-                    disabled={saving || disableControls || isTesting || keyOnly}
-                  >
-                    {t('ai_providers.claude_models_fetch_button')}
-                  </Button>
-                </div>
-              </div>
-
-              <div className={styles.sectionHint}>{t('ai_providers.claude_models_hint')}</div>
-
-              <ModelInputList
-                entries={form.modelEntries}
-                onChange={(entries) => setForm((prev) => ({ ...prev, modelEntries: entries }))}
-                namePlaceholder={t('common.model_name_placeholder')}
-                aliasPlaceholder={t('common.model_alias_placeholder')}
-                disabled={saving || disableControls || isTesting || keyOnly}
-                hideAddButton
-                className={styles.modelInputList}
-                rowClassName={styles.modelInputRow}
-                inputClassName={styles.modelInputField}
-                removeButtonClassName={styles.modelRowRemoveButton}
-                removeButtonTitle={t('common.delete')}
-                removeButtonAriaLabel={t('common.delete')}
-              />
-
-              <div className={styles.modelTestPanel}>
-                <div className={styles.modelTestMeta}>
-                  <label className={styles.modelTestLabel}>{t('ai_providers.claude_test_title')}</label>
-                  <span className={styles.modelTestHint}>{t('ai_providers.claude_test_hint')}</span>
-                </div>
-                <div className={styles.modelTestControls}>
-                  <Select
-                    value={testModel}
-                    options={modelSelectOptions}
-                    onChange={(value) => {
-                      setTestModel(value);
-                      setTestStatus('idle');
-                      setTestMessage('');
-                    }}
-                    placeholder={
-                      availableModels.length
-                        ? t('ai_providers.claude_test_select_placeholder')
-                        : t('ai_providers.claude_test_select_empty')
-                    }
-                    className={styles.openaiTestSelect}
-                    ariaLabel={t('ai_providers.claude_test_title')}
-                    disabled={
-                      saving ||
-                      disableControls ||
-                      isTesting ||
-                      testStatus === 'loading' ||
-                      availableModels.length === 0
-                    }
-                  />
-                  <Button
-                    variant={testStatus === 'error' ? 'danger' : 'secondary'}
-                    size="sm"
-                    onClick={() => void runClaudeConnectivityTest()}
-                    loading={testStatus === 'loading'}
-                    disabled={
-                      saving ||
-                      disableControls ||
-                      isTesting ||
-                      testStatus === 'loading' ||
-                      availableModels.length === 0
-                    }
-                    className={styles.modelTestAllButton}
-                  >
-                    {t('ai_providers.claude_test_action')}
-                  </Button>
-                </div>
-              </div>
-
-              {testMessage && (
-                <div
-                  className={`status-badge ${
-                    testStatus === 'error'
-                      ? 'error'
-                      : testStatus === 'success'
-                        ? 'success'
-                        : 'muted'
-                  }`}
-                >
-                  {testMessage}
-                </div>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label>{t('ai_providers.excluded_models_label')}</label>
-              <textarea
-                className="input"
-                placeholder={t('ai_providers.excluded_models_placeholder')}
-                value={form.excludedText}
-                onChange={(e) => setForm((prev) => ({ ...prev, excludedText: e.target.value }))}
-                rows={4}
-                disabled={saving || disableControls || isTesting || keyOnly}
-              />
-              <div className="hint">{t('ai_providers.excluded_models_hint')}</div>
-            </div>
-
-            <div className={styles.modelConfigSection}>
-              <div className={styles.modelConfigHeader}>
-                <label className={styles.modelConfigTitle}>{t('ai_providers.claude_cloak_title')}</label>
-                <div className={styles.modelConfigToolbar}>
-                  <ToggleSwitch
-                    checked={Boolean(form.cloak)}
-                    onChange={(enabled) =>
-                      setForm((prev) => {
-                        if (!enabled) {
-                          if (prev.cloak) {
-                            lastCloakConfigRef.current = prev.cloak;
-                          }
-                          return { ...prev, cloak: undefined };
+                <div className={styles.modelConfigSection}>
+                  <div className={styles.modelConfigHeader}>
+                    <label className={styles.modelConfigTitle}>{t('ai_providers.claude_models_label')}</label>
+                    <div className={styles.modelConfigToolbar}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            modelEntries: [...prev.modelEntries, { name: '', alias: '' }],
+                          }))
                         }
+                        disabled={saving || disableControls || isTesting}
+                      >
+                        {t('ai_providers.claude_models_add_btn')}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={openClaudeModelDiscovery}
+                        disabled={saving || disableControls || isTesting}
+                      >
+                        {t('ai_providers.claude_models_fetch_button')}
+                      </Button>
+                    </div>
+                  </div>
 
-                        const restored = prev.cloak
-                          ?? lastCloakConfigRef.current
-                          ?? { mode: 'auto', strictMode: false, sensitiveWords: [] };
-                        const mode = String(restored.mode ?? 'auto').trim() || 'auto';
-                        return {
-                          ...prev,
-                          cloak: {
-                            mode,
-                            strictMode: restored.strictMode ?? false,
-                            sensitiveWords: restored.sensitiveWords ?? [],
-                          },
-                        };
-                      })
-                    }
-                    disabled={saving || disableControls || isTesting || keyOnly}
-                    ariaLabel={t('ai_providers.claude_cloak_toggle_aria')}
-                    label={t('ai_providers.claude_cloak_toggle_label')}
+                  <div className={styles.sectionHint}>{t('ai_providers.claude_models_hint')}</div>
+
+                  <ModelInputList
+                    entries={form.modelEntries}
+                    onChange={(entries) => setForm((prev) => ({ ...prev, modelEntries: entries }))}
+                    namePlaceholder={t('common.model_name_placeholder')}
+                    aliasPlaceholder={t('common.model_alias_placeholder')}
+                    disabled={saving || disableControls || isTesting}
+                    hideAddButton
+                    className={styles.modelInputList}
+                    rowClassName={styles.modelInputRow}
+                    inputClassName={styles.modelInputField}
+                    removeButtonClassName={styles.modelRowRemoveButton}
+                    removeButtonTitle={t('common.delete')}
+                    removeButtonAriaLabel={t('common.delete')}
                   />
+
+                  <div className={styles.modelTestPanel}>
+                    <div className={styles.modelTestMeta}>
+                      <label className={styles.modelTestLabel}>{t('ai_providers.claude_test_title')}</label>
+                      <span className={styles.modelTestHint}>{t('ai_providers.claude_test_hint')}</span>
+                    </div>
+                    <div className={styles.modelTestControls}>
+                      <Select
+                        value={testModel}
+                        options={modelSelectOptions}
+                        onChange={(value) => {
+                          setTestModel(value);
+                          setTestStatus('idle');
+                          setTestMessage('');
+                        }}
+                        placeholder={
+                          availableModels.length
+                            ? t('ai_providers.claude_test_select_placeholder')
+                            : t('ai_providers.claude_test_select_empty')
+                        }
+                        className={styles.openaiTestSelect}
+                        ariaLabel={t('ai_providers.claude_test_title')}
+                        disabled={
+                          saving ||
+                          disableControls ||
+                          isTesting ||
+                          testStatus === 'loading' ||
+                          availableModels.length === 0
+                        }
+                      />
+                      <Button
+                        variant={testStatus === 'error' ? 'danger' : 'secondary'}
+                        size="sm"
+                        onClick={() => void runClaudeConnectivityTest()}
+                        loading={testStatus === 'loading'}
+                        disabled={
+                          saving ||
+                          disableControls ||
+                          isTesting ||
+                          testStatus === 'loading' ||
+                          availableModels.length === 0
+                        }
+                        className={styles.modelTestAllButton}
+                      >
+                        {t('ai_providers.claude_test_action')}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {testMessage && (
+                    <div
+                      className={`status-badge ${
+                        testStatus === 'error'
+                          ? 'error'
+                          : testStatus === 'success'
+                            ? 'success'
+                            : 'muted'
+                      }`}
+                    >
+                      {testMessage}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className={styles.sectionHint}>{t('ai_providers.claude_cloak_hint')}</div>
 
-              {form.cloak ? (
-                <>
-                  <div className="form-group">
-                    <label>{t('ai_providers.claude_cloak_mode_label')}</label>
-                    <Select
-                      value={resolvedCloakMode}
-                      options={cloakModeOptions}
-                      onChange={(value) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          cloak: {
-                            ...(prev.cloak ?? {}),
-                            mode: value,
-                          },
-                        }))
-                      }
-                      ariaLabel={t('ai_providers.claude_cloak_mode_label')}
-                      disabled={saving || disableControls || isTesting || keyOnly}
-                    />
-                    <div className="hint">{t('ai_providers.claude_cloak_mode_hint')}</div>
-                  </div>
+                <div className="form-group">
+                  <label>{t('ai_providers.excluded_models_label')}</label>
+                  <textarea
+                    className="input"
+                    placeholder={t('ai_providers.excluded_models_placeholder')}
+                    value={form.excludedText}
+                    onChange={(e) => setForm((prev) => ({ ...prev, excludedText: e.target.value }))}
+                    rows={4}
+                    disabled={saving || disableControls || isTesting}
+                  />
+                  <div className="hint">{t('ai_providers.excluded_models_hint')}</div>
+                </div>
 
-                  <div className="form-group">
-                    <label>{t('ai_providers.claude_cloak_strict_label')}</label>
-                    <ToggleSwitch
-                      checked={Boolean(form.cloak.strictMode)}
-                      onChange={(value) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          cloak: {
-                            ...(prev.cloak ?? {}),
-                            strictMode: value,
-                          },
-                        }))
-                      }
-                      disabled={saving || disableControls || isTesting || keyOnly}
-                      ariaLabel={t('ai_providers.claude_cloak_strict_label')}
-                    />
-                    <div className="hint">{t('ai_providers.claude_cloak_strict_hint')}</div>
-                  </div>
+                <div className={styles.modelConfigSection}>
+                  <div className={styles.modelConfigHeader}>
+                    <label className={styles.modelConfigTitle}>{t('ai_providers.claude_cloak_title')}</label>
+                    <div className={styles.modelConfigToolbar}>
+                      <ToggleSwitch
+                        checked={Boolean(form.cloak)}
+                        onChange={(enabled) =>
+                          setForm((prev) => {
+                            if (!enabled) {
+                              if (prev.cloak) {
+                                lastCloakConfigRef.current = prev.cloak;
+                              }
+                              return { ...prev, cloak: undefined };
+                            }
 
-                  <div className="form-group">
-                    <label>{t('ai_providers.claude_cloak_sensitive_words_label')}</label>
-                    <textarea
-                      className="input"
-                      placeholder={t('ai_providers.claude_cloak_sensitive_words_placeholder')}
-                      value={(form.cloak.sensitiveWords ?? []).join('\n')}
-                      onChange={(e) => {
-                        const nextWords = parseTextList(e.target.value);
-                        setForm((prev) => ({
-                          ...prev,
-                          cloak: {
-                            ...(prev.cloak ?? {}),
-                            sensitiveWords: nextWords.length ? nextWords : undefined,
-                          },
-                        }));
-                      }}
-                      rows={3}
-                      disabled={saving || disableControls || isTesting || keyOnly}
-                    />
-                    <div className="hint">{t('ai_providers.claude_cloak_sensitive_words_hint')}</div>
+                            const restored = prev.cloak
+                              ?? lastCloakConfigRef.current
+                              ?? { mode: 'auto', strictMode: false, sensitiveWords: [] };
+                            const mode = String(restored.mode ?? 'auto').trim() || 'auto';
+                            return {
+                              ...prev,
+                              cloak: {
+                                mode,
+                                strictMode: restored.strictMode ?? false,
+                                sensitiveWords: restored.sensitiveWords ?? [],
+                              },
+                            };
+                          })
+                        }
+                        disabled={saving || disableControls || isTesting}
+                        ariaLabel={t('ai_providers.claude_cloak_toggle_aria')}
+                        label={t('ai_providers.claude_cloak_toggle_label')}
+                      />
+                    </div>
                   </div>
-                </>
-              ) : null}
-            </div>
+                  <div className={styles.sectionHint}>{t('ai_providers.claude_cloak_hint')}</div>
+
+                  {form.cloak ? (
+                    <>
+                      <div className="form-group">
+                        <label>{t('ai_providers.claude_cloak_mode_label')}</label>
+                        <Select
+                          value={resolvedCloakMode}
+                          options={cloakModeOptions}
+                          onChange={(value) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              cloak: {
+                                ...(prev.cloak ?? {}),
+                                mode: value,
+                              },
+                            }))
+                          }
+                          ariaLabel={t('ai_providers.claude_cloak_mode_label')}
+                          disabled={saving || disableControls || isTesting}
+                        />
+                        <div className="hint">{t('ai_providers.claude_cloak_mode_hint')}</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>{t('ai_providers.claude_cloak_strict_label')}</label>
+                        <ToggleSwitch
+                          checked={Boolean(form.cloak.strictMode)}
+                          onChange={(value) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              cloak: {
+                                ...(prev.cloak ?? {}),
+                                strictMode: value,
+                              },
+                            }))
+                          }
+                          disabled={saving || disableControls || isTesting}
+                          ariaLabel={t('ai_providers.claude_cloak_strict_label')}
+                        />
+                        <div className="hint">{t('ai_providers.claude_cloak_strict_hint')}</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>{t('ai_providers.claude_cloak_sensitive_words_label')}</label>
+                        <textarea
+                          className="input"
+                          placeholder={t('ai_providers.claude_cloak_sensitive_words_placeholder')}
+                          value={(form.cloak.sensitiveWords ?? []).join('\n')}
+                          onChange={(e) => {
+                            const nextWords = parseTextList(e.target.value);
+                            setForm((prev) => ({
+                              ...prev,
+                              cloak: {
+                                ...(prev.cloak ?? {}),
+                                sensitiveWords: nextWords.length ? nextWords : undefined,
+                              },
+                            }));
+                          }}
+                          rows={3}
+                          disabled={saving || disableControls || isTesting}
+                        />
+                        <div className="hint">{t('ai_providers.claude_cloak_sensitive_words_hint')}</div>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              </>
+            )}
           </div>
         )}
       </Card>
