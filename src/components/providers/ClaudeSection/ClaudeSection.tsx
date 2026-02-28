@@ -85,11 +85,12 @@ export function ClaudeSection({
               <thead>
                 <tr>
                   <th>{t('common.base_url')}</th>
-                  <th>{t('ai_providers.claude_key_or_count', { defaultValue: 'Key / Count' })}</th>
-                  <th>{t('common.priority')}</th>
-                  <th>{t('common.prefix')}</th>
+                  <th>{t('ai_providers.claude_count')}</th>
+                  <th>{t('ai_providers.claude_key')}</th>
                   <th>{t('stats.success')}</th>
                   <th>{t('stats.failure')}</th>
+                  <th>{t('common.priority')}</th>
+                  <th>{t('common.prefix')}</th>
                   <th>{t('common.actions', { defaultValue: 'Actions' })}</th>
                 </tr>
               </thead>
@@ -147,16 +148,17 @@ export function ClaudeSection({
                               })}
                           </td>
                           <td>{group.items.length}</td>
-                          <td>—</td>
-                          <td>—</td>
+                          <td></td>
                           <td>{group.success}</td>
                           <td>{group.failure}</td>
+                          <td></td>
+                          <td></td>
                           <td onClick={(e) => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
                               <div style={{ display: 'flex', gap: 8 }}>
                                 {onEditGroup && (
                                   <Button
-                                    variant="secondary"
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => onEditGroup(groupIndices)}
                                     disabled={actionsDisabled}
@@ -166,7 +168,7 @@ export function ClaudeSection({
                                 )}
                                 {onAddInGroup && (
                                   <Button
-                                    variant="secondary"
+                                    variant="ghost"
                                     size="sm"
                                     onClick={onAddInGroup}
                                     disabled={actionsDisabled}
@@ -198,18 +200,19 @@ export function ClaudeSection({
                             return (
                               <tr key={`${key}-${index}`} className={styles.providerTableRowChild}>
                                 <td />
+                                <td></td>
                                 <td className={styles.providerTableKeyCell} title={config.apiKey}>
                                   {maskApiKeyCompact(config.apiKey)}
                                 </td>
-                                <td>{config.priority ?? '—'}</td>
-                                <td>{config.prefix ?? '—'}</td>
                                 <td>{stats.success}</td>
                                 <td>{stats.failure}</td>
+                                <td>{config.priority ?? ''}</td>
+                                <td>{config.prefix ?? ''}</td>
                                 <td>
                                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
                                     <div style={{ display: 'flex', gap: 8 }}>
                                       <Button
-                                        variant="secondary"
+                                        variant="ghost"
                                         size="sm"
                                         onClick={() =>
                                           onEditKey ? onEditKey(index) : onEdit(index)
@@ -219,7 +222,7 @@ export function ClaudeSection({
                                         {t('common.edit')}
                                       </Button>
                                       <Button
-                                        variant="danger-ghost"
+                                        variant="ghost" style={{ color: "var(--danger-color, #ef4444)" }}
                                         size="sm"
                                         onClick={() => onDelete(index)}
                                         disabled={actionsDisabled}
