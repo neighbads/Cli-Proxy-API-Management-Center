@@ -31,6 +31,19 @@ export function maskApiKey(key: string): string {
 }
 
 /**
+ * 密钥紧凑显示：前 4 字符 + "**" + 后 4 字符，适配固定列宽
+ */
+export function maskApiKeyCompact(key: string, first = 8, last = 8): string {
+  const trimmed = String(key || '').trim();
+  if (!trimmed) return '';
+  const need = first + last;
+  if (trimmed.length <= need) return trimmed;
+  const start = trimmed.slice(0, first);
+  const end = trimmed.slice(-last);
+  return `${start}****${end}`;
+}
+
+/**
  * 格式化文件大小
  */
 export function formatFileSize(bytes: number): string {

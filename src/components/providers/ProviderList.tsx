@@ -55,7 +55,7 @@ export function ProviderList<T>({
             <div className="item-meta">{renderContent(item, index)}</div>
             <div className="item-actions">
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 onClick={() => onEdit(index)}
                 disabled={actionsDisabled}
@@ -63,7 +63,8 @@ export function ProviderList<T>({
                 {t('common.edit')}
               </Button>
               <Button
-                variant="danger"
+                variant="ghost"
+                style={{ color: 'var(--danger-color, #ef4444)' }}
                 size="sm"
                 onClick={() => onDelete(index)}
                 disabled={actionsDisabled}

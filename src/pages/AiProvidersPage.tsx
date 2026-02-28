@@ -165,22 +165,29 @@ export function AiProvidersPage() {
 
   const setConfigEnabled = async (
     provider: 'gemini' | 'codex' | 'claude',
-    index: number,
+    index: number | number[],
     enabled: boolean
   ) => {
-    if (provider === 'gemini') {
-      const current = geminiKeys[index];
-      if (!current) return;
+    const indices = Array.isArray(index) ? index : [index];
+    if (indices.length === 0) return;
 
-      const switchingKey = `${provider}:${current.apiKey}`;
+    if (provider === 'gemini') {
+      const firstCurrent = geminiKeys[indices[0]];
+      if (!firstCurrent) return;
+
+      const switchingKey = `${provider}:${firstCurrent.apiKey}`;
       setConfigSwitchingKey(switchingKey);
 
       const previousList = geminiKeys;
-      const nextExcluded = enabled
-        ? withoutDisableAllModelsRule(current.excludedModels)
-        : withDisableAllModelsRule(current.excludedModels);
-      const nextItem: GeminiKeyConfig = { ...current, excludedModels: nextExcluded };
-      const nextList = previousList.map((item, idx) => (idx === index ? nextItem : item));
+      const nextList = previousList.map((item, idx) => {
+        if (indices.includes(idx)) {
+          const nextExcluded = enabled
+            ? withoutDisableAllModelsRule(item.excludedModels)
+            : withDisableAllModelsRule(item.excludedModels);
+          return { ...item, excludedModels: nextExcluded };
+        }
+        return item;
+      });
 
       setGeminiKeys(nextList);
       updateConfigValue('gemini-api-key', nextList);
@@ -205,18 +212,22 @@ export function AiProvidersPage() {
     }
 
     const source = provider === 'codex' ? codexConfigs : claudeConfigs;
-    const current = source[index];
-    if (!current) return;
+    const firstCurrent = source[indices[0]];
+    if (!firstCurrent) return;
 
-    const switchingKey = `${provider}:${current.apiKey}`;
+    const switchingKey = `${provider}:${firstCurrent.apiKey}`;
     setConfigSwitchingKey(switchingKey);
 
     const previousList = source;
-    const nextExcluded = enabled
-      ? withoutDisableAllModelsRule(current.excludedModels)
-      : withDisableAllModelsRule(current.excludedModels);
-    const nextItem: ProviderKeyConfig = { ...current, excludedModels: nextExcluded };
-    const nextList = previousList.map((item, idx) => (idx === index ? nextItem : item));
+    const nextList = previousList.map((item, idx) => {
+      if (indices.includes(idx)) {
+        const nextExcluded = enabled
+          ? withoutDisableAllModelsRule(item.excludedModels)
+          : withDisableAllModelsRule(item.excludedModels);
+        return { ...item, excludedModels: nextExcluded };
+      }
+      return item;
+    });
 
     if (provider === 'codex') {
       setCodexConfigs(nextList);
@@ -352,7 +363,21 @@ export function AiProvidersPage() {
             disableControls={disableControls}
             isSwitching={isSwitching}
             onAdd={() => openEditor('/ai-providers/gemini/new')}
-            onEdit={(index) => openEditor(`/ai-providers/gemini/${index}`)}
+            onAddInGroup={() =>
+              navigate('/ai-providers/gemini/new', {
+                state: { fromAiProviders: true, keyOnly: true },
+              })
+            }
+            onEditGroup={(groupIndices) =>
+              navigate(`/ai-providers/gemini/${groupIndices[0]}`, {
+                state: { fromAiProviders: true, groupIndices },
+              })
+            }
+            onEdit={(index) =>
+              navigate(`/ai-providers/gemini/${index}`, {
+                state: { fromAiProviders: true, keyOnly: true },
+              })
+            }
             onDelete={deleteGemini}
             onToggle={(index, enabled) => void setConfigEnabled('gemini', index, enabled)}
           />
@@ -368,7 +393,21 @@ export function AiProvidersPage() {
             isSwitching={isSwitching}
             resolvedTheme={resolvedTheme}
             onAdd={() => openEditor('/ai-providers/codex/new')}
-            onEdit={(index) => openEditor(`/ai-providers/codex/${index}`)}
+            onAddInGroup={() =>
+              navigate('/ai-providers/codex/new', {
+                state: { fromAiProviders: true, keyOnly: true },
+              })
+            }
+            onEditGroup={(groupIndices) =>
+              navigate(`/ai-providers/codex/${groupIndices[0]}`, {
+                state: { fromAiProviders: true, groupIndices },
+              })
+            }
+            onEdit={(index) =>
+              navigate(`/ai-providers/codex/${index}`, {
+                state: { fromAiProviders: true, keyOnly: true },
+              })
+            }
             onDelete={(index) => void deleteProviderEntry('codex', index)}
             onToggle={(index, enabled) => void setConfigEnabled('codex', index, enabled)}
           />
@@ -384,6 +423,21 @@ export function AiProvidersPage() {
             isSwitching={isSwitching}
             onAdd={() => openEditor('/ai-providers/claude/new')}
             onEdit={(index) => openEditor(`/ai-providers/claude/${index}`)}
+            onAddInGroup={() =>
+              navigate('/ai-providers/claude/new', {
+                state: { fromAiProviders: true, keyOnly: true },
+              })
+            }
+            onEditKey={(index) =>
+              navigate(`/ai-providers/claude/${index}`, {
+                state: { fromAiProviders: true, keyOnly: true },
+              })
+            }
+            onEditGroup={(groupIndices) =>
+              navigate('/ai-providers/claude/group-edit', {
+                state: { fromAiProviders: true, groupIndices },
+              })
+            }
             onDelete={(index) => void deleteProviderEntry('claude', index)}
             onToggle={(index, enabled) => void setConfigEnabled('claude', index, enabled)}
           />
@@ -398,7 +452,21 @@ export function AiProvidersPage() {
             disableControls={disableControls}
             isSwitching={isSwitching}
             onAdd={() => openEditor('/ai-providers/vertex/new')}
-            onEdit={(index) => openEditor(`/ai-providers/vertex/${index}`)}
+            onAddInGroup={() =>
+              navigate('/ai-providers/vertex/new', {
+                state: { fromAiProviders: true, keyOnly: true },
+              })
+            }
+            onEditGroup={(groupIndices) =>
+              navigate(`/ai-providers/vertex/${groupIndices[0]}`, {
+                state: { fromAiProviders: true, groupIndices },
+              })
+            }
+            onEdit={(index) =>
+              navigate(`/ai-providers/vertex/${index}`, {
+                state: { fromAiProviders: true, keyOnly: true },
+              })
+            }
             onDelete={deleteVertex}
           />
         </div>

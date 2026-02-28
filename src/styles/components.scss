@@ -27,7 +27,7 @@
   }
 
   &.btn-secondary {
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-secondary);
     border-color: var(--border-color);
     color: var(--text-primary);
 
@@ -55,6 +55,18 @@
 
     &:hover {
       background-color: color.adjust($error-color, $lightness: -5%);
+    }
+  }
+
+  &.btn-danger-ghost {
+    background: transparent;
+    border-color: rgba($error-color, 0.5);
+    color: $error-color;
+
+    &:hover {
+      background: rgba($error-color, 0.1);
+      border-color: $error-color;
+      color: color.adjust($error-color, $lightness: -10%);
     }
   }
 

@@ -123,6 +123,178 @@
   font-family: 'Monaco', 'Menlo', 'Consolas', 'Ubuntu Mono', monospace;
 }
 
+// 提供商表格：固定列宽防展开闪动，合并行/子行颜色区分
+.providerTable {
+  table-layout: fixed;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+
+  th {
+    background: rgba(139, 134, 128, 0.07);
+  }
+
+  th,
+  td {
+    box-sizing: border-box;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    text-align: center !important;
+  }
+
+  // 地址列（第1列）：左对齐，固定较小宽度
+  th:nth-child(1) {
+    text-align: left !important;
+    padding-left: 30px !important;
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+  }
+  td:nth-child(1) {
+    text-align: left !important;
+    padding-left: 20px !important;
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // 数量列（第2列）
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: 8ch;
+    min-width: 8ch;
+    max-width: 8ch;
+  }
+
+  // 密钥列（第3列）
+  th:nth-child(3),
+  td:nth-child(3),
+  .providerTableKeyCell {
+    font-family: 'Monaco', 'Menlo', 'Consolas', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // 成功(4) / 失败(5) / 优先级(6) 较小固定宽度
+  th:nth-child(4),
+  td:nth-child(4),
+  th:nth-child(5),
+  td:nth-child(5),
+  th:nth-child(6),
+  td:nth-child(6) {
+    width: 12ch;
+    min-width: 12ch;
+    max-width: 12ch;
+  }
+
+  // 前缀列（第7列）
+  th:nth-child(7) {
+    text-align: left !important;
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+  }
+  td:nth-child(7) {
+    text-align: left !important;
+  }
+
+  // 操作列（第8列）
+  th:nth-child(8) {
+    text-align: left !important;
+    padding-left: 30px !important;
+  }
+  td:nth-child(8) {
+    text-align: left !important;
+    padding-left: 20px !important;
+    width: 260px;
+    min-width: 260px;
+    max-width: 260px;
+    overflow: hidden;
+  }
+
+  // 去除最后一行的底边框
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+// 父行（分组标题行）：玻璃白，与卡片暖米色背景形成可见对比
+// 注意：box-shadow 在 <tr> 上浏览器不渲染，仅用 background 区分层次
+.providerTableRowMerged {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.88),
+    rgba(255, 255, 255, 0.74)
+  );
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.97);
+  }
+}
+
+// 子行（展开后）：半透明浅白，层次低于父行
+// 注意：::before 在 <tr> 上 position:absolute 浏览器支持不一致，改用第一个 td 的左边框
+.providerTableRowChild {
+  background: rgba(255, 255, 255, 0.42);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  transition: background 0.15s ease;
+
+  // 用第一个 td 的左边框代替 ::before 色条
+  td:first-child {
+    border-left: 3px solid var(--primary-color);
+    opacity: 1;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.65);
+  }
+}
+
+:global([data-theme='dark']) {
+  .providerTable {
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 2px 16px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+    th {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    th, td {
+      border-bottom-color: rgba(255, 255, 255, 0.06);
+    }
+  }
+  .providerTableRowMerged {
+    background: rgba(255, 255, 255, 0.07);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.11);
+    }
+  }
+  .providerTableRowChild {
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom-color: rgba(255, 255, 255, 0.04);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}
+
 // 自定义请求头徽章
 .headerBadgeList {
   display: flex;

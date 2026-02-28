@@ -1,19 +1,14 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import iconVertex from '@/assets/icons/vertex.svg';
 import type { ProviderKeyConfig } from '@/types';
-import { maskApiKey } from '@/utils/format';
-import {
-  buildCandidateUsageSourceIds,
-  calculateStatusBarData,
-  type KeyStats,
-  type UsageDetail,
-} from '@/utils/usage';
+import { maskApiKeyCompact } from '@/utils/format';
+import type { KeyStats, UsageDetail } from '@/utils/usage';
 import styles from '@/pages/AiProvidersPage.module.scss';
-import { ProviderList } from '../ProviderList';
-import { ProviderStatusBar } from '../ProviderStatusBar';
+import usageStyles from '@/pages/UsagePage.module.scss';
 import { getStatsBySource } from '../utils';
 
 interface VertexSectionProps {
@@ -24,6 +19,8 @@ interface VertexSectionProps {
   disableControls: boolean;
   isSwitching: boolean;
   onAdd: () => void;
+  onAddInGroup?: () => void;
+  onEditGroup?: (groupIndices: number[]) => void;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
 }
@@ -31,34 +28,27 @@ interface VertexSectionProps {
 export function VertexSection({
   configs,
   keyStats,
-  usageDetails,
+  usageDetails: _usageDetails,
   loading,
   disableControls,
   isSwitching,
   onAdd,
+  onAddInGroup,
+  onEditGroup,
   onEdit,
   onDelete,
 }: VertexSectionProps) {
   const { t } = useTranslation();
   const actionsDisabled = disableControls || loading || isSwitching;
 
-  const statusBarCache = useMemo(() => {
-    const cache = new Map<string, ReturnType<typeof calculateStatusBarData>>();
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-    configs.forEach((config) => {
-      if (!config.apiKey) return;
-      const candidates = buildCandidateUsageSourceIds({
-        apiKey: config.apiKey,
-        prefix: config.prefix,
-      });
-      if (!candidates.length) return;
-      const candidateSet = new Set(candidates);
-      const filteredDetails = usageDetails.filter((detail) => candidateSet.has(detail.source));
-      cache.set(config.apiKey, calculateStatusBarData(filteredDetails));
-    });
-
-    return cache;
-  }, [configs, usageDetails]);
+  const toggleGroup = (baseUrlKey: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [baseUrlKey]: !prev[baseUrlKey],
+    }));
+  };
 
   return (
     <>
@@ -75,84 +65,154 @@ export function VertexSection({
           </Button>
         }
       >
-        <ProviderList<ProviderKeyConfig>
-          items={configs}
-          loading={loading}
-          keyField={(item) => item.apiKey}
-          emptyTitle={t('ai_providers.vertex_empty_title')}
-          emptyDescription={t('ai_providers.vertex_empty_desc')}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          actionsDisabled={actionsDisabled}
-          renderContent={(item, index) => {
-            const stats = getStatsBySource(item.apiKey, keyStats, item.prefix);
-            const headerEntries = Object.entries(item.headers || {});
-            const statusData = statusBarCache.get(item.apiKey) || calculateStatusBarData([]);
+        {loading && configs.length === 0 ? (
+          <div className="hint">{t('common.loading')}</div>
+        ) : configs.length === 0 ? (
+          <EmptyState
+            title={t('ai_providers.vertex_empty_title')}
+            description={t('ai_providers.vertex_empty_desc')}
+          />
+        ) : (
+          <div className={usageStyles.tableWrapper}>
+            <table className={`${usageStyles.table} ${styles.providerTable}`}>
+              <thead>
+                <tr>
+                  <th>{t('common.base_url')}</th>
+                  <th>{t('ai_providers.claude_count')}</th>
+                  <th>{t('ai_providers.claude_key')}</th>
+                  <th>{t('stats.success')}</th>
+                  <th>{t('stats.failure')}</th>
+                  <th>{t('common.prefix')}</th>
+                  <th>{t('common.actions', { defaultValue: 'Actions' })}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const groupMap = new Map<
+                    string,
+                    {
+                      baseUrl?: string;
+                      items: { config: ProviderKeyConfig; index: number }[];
+                      success: number;
+                      failure: number;
+                    }
+                  >();
 
-            return (
-              <Fragment>
-                <div className="item-title">
-                  {t('ai_providers.vertex_item_title')} #{index + 1}
-                </div>
-                <div className={styles.fieldRow}>
-                  <span className={styles.fieldLabel}>{t('common.api_key')}:</span>
-                  <span className={styles.fieldValue}>{maskApiKey(item.apiKey)}</span>
-                </div>
-                {item.prefix && (
-                  <div className={styles.fieldRow}>
-                    <span className={styles.fieldLabel}>{t('common.prefix')}:</span>
-                    <span className={styles.fieldValue}>{item.prefix}</span>
-                  </div>
-                )}
-                {item.baseUrl && (
-                  <div className={styles.fieldRow}>
-                    <span className={styles.fieldLabel}>{t('common.base_url')}:</span>
-                    <span className={styles.fieldValue}>{item.baseUrl}</span>
-                  </div>
-                )}
-                {item.proxyUrl && (
-                  <div className={styles.fieldRow}>
-                    <span className={styles.fieldLabel}>{t('common.proxy_url')}:</span>
-                    <span className={styles.fieldValue}>{item.proxyUrl}</span>
-                  </div>
-                )}
-                {headerEntries.length > 0 && (
-                  <div className={styles.headerBadgeList}>
-                    {headerEntries.map(([key, value]) => (
-                      <span key={key} className={styles.headerBadge}>
-                        <strong>{key}:</strong> {value}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {item.models?.length ? (
-                  <div className={styles.modelTagList}>
-                    <span className={styles.modelCountLabel}>
-                      {t('ai_providers.vertex_models_count')}: {item.models.length}
-                    </span>
-                    {item.models.map((model) => (
-                      <span key={`${model.name}-${model.alias || 'default'}`} className={styles.modelTag}>
-                        <span className={styles.modelName}>{model.name}</span>
-                        {model.alias && (
-                          <span className={styles.modelAlias}>{model.alias}</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                <div className={styles.cardStats}>
-                  <span className={`${styles.statPill} ${styles.statSuccess}`}>
-                    {t('stats.success')}: {stats.success}
-                  </span>
-                  <span className={`${styles.statPill} ${styles.statFailure}`}>
-                    {t('stats.failure')}: {stats.failure}
-                  </span>
-                </div>
-                <ProviderStatusBar statusData={statusData} />
-              </Fragment>
-            );
-          }}
-        />
+                  configs.forEach((config, index) => {
+                    const baseUrlKey = config.baseUrl || '__default__';
+                    const stats = getStatsBySource(config.apiKey, keyStats, config.prefix);
+                    const existing = groupMap.get(baseUrlKey);
+                    if (existing) {
+                      existing.items.push({ config, index });
+                      existing.success += stats.success;
+                      existing.failure += stats.failure;
+                    } else {
+                      groupMap.set(baseUrlKey, {
+                        baseUrl: config.baseUrl,
+                        items: [{ config, index }],
+                        success: stats.success,
+                        failure: stats.failure,
+                      });
+                    }
+                  });
+
+                  const groups = Array.from(groupMap.values());
+
+                  return groups.map((group) => {
+                    const key = group.baseUrl || '__default__';
+                    const isExpanded = !!expandedGroups[key];
+
+                    return (
+                      <Fragment key={key}>
+                        <tr
+                          className={styles.providerTableRowMerged}
+                          onClick={() => toggleGroup(key)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <td>
+                            {group.baseUrl ||
+                              t('ai_providers.default_base_url_label', {
+                                defaultValue: 'Default (environment / global)',
+                              })}
+                          </td>
+                          <td>{group.items.length}</td>
+                          <td></td>
+                          <td>{group.success}</td>
+                          <td>{group.failure}</td>
+                          <td></td>
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              {onEditGroup && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => onEditGroup(group.items.map((i) => i.index))}
+                                  disabled={actionsDisabled}
+                                >
+                                  {t('common.edit')}
+                                </Button>
+                              )}
+                              {onAddInGroup && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={onAddInGroup}
+                                  disabled={actionsDisabled}
+                                >
+                                  {t('ai_providers.group_add_button', { defaultValue: 'Add' })}
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded &&
+                          group.items.map(({ config, index }) => {
+                            const stats = getStatsBySource(
+                              config.apiKey,
+                              keyStats,
+                              config.prefix
+                            );
+                            return (
+                              <tr key={`${key}-${index}`} className={styles.providerTableRowChild}>
+                                <td />
+                                <td></td>
+                                <td className={styles.providerTableKeyCell} title={config.apiKey}>
+                                  {maskApiKeyCompact(config.apiKey)}
+                                </td>
+                                <td>{stats.success}</td>
+                                <td>{stats.failure}</td>
+                                <td>{config.prefix ?? ''}</td>
+                                <td>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => onEdit(index)}
+                                      disabled={actionsDisabled}
+                                    >
+                                      {t('common.edit')}
+                                    </Button>
+                                    <Button
+                                      variant="ghost" style={{ color: 'var(--danger-color, #ef4444)' }}
+                                      size="sm"
+                                      onClick={() => onDelete(index)}
+                                      disabled={actionsDisabled}
+                                    >
+                                      {t('common.delete')}
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </Fragment>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </>
   );

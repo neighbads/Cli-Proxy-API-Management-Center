@@ -1,21 +1,15 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { IconCheck, IconX } from '@/components/ui/icons';
+import { EmptyState } from '@/components/ui/EmptyState';
 import iconOpenaiLight from '@/assets/icons/openai-light.svg';
 import iconOpenaiDark from '@/assets/icons/openai-dark.svg';
 import type { OpenAIProviderConfig } from '@/types';
-import { maskApiKey } from '@/utils/format';
-import {
-  buildCandidateUsageSourceIds,
-  calculateStatusBarData,
-  type KeyStats,
-  type UsageDetail,
-} from '@/utils/usage';
+import { maskApiKeyCompact } from '@/utils/format';
+import type { KeyStats, UsageDetail } from '@/utils/usage';
 import styles from '@/pages/AiProvidersPage.module.scss';
-import { ProviderList } from '../ProviderList';
-import { ProviderStatusBar } from '../ProviderStatusBar';
+import usageStyles from '@/pages/UsagePage.module.scss';
 import { getOpenAIProviderStats, getStatsBySource } from '../utils';
 
 interface OpenAISectionProps {
@@ -34,7 +28,7 @@ interface OpenAISectionProps {
 export function OpenAISection({
   configs,
   keyStats,
-  usageDetails,
+  usageDetails: _usageDetails,
   loading,
   disableControls,
   isSwitching,
@@ -46,24 +40,11 @@ export function OpenAISection({
   const { t } = useTranslation();
   const actionsDisabled = disableControls || loading || isSwitching;
 
-  const statusBarCache = useMemo(() => {
-    const cache = new Map<string, ReturnType<typeof calculateStatusBarData>>();
+  const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
 
-    configs.forEach((provider) => {
-      const sourceIds = new Set<string>();
-      buildCandidateUsageSourceIds({ prefix: provider.prefix }).forEach((id) => sourceIds.add(id));
-      (provider.apiKeyEntries || []).forEach((entry) => {
-        buildCandidateUsageSourceIds({ apiKey: entry.apiKey }).forEach((id) => sourceIds.add(id));
-      });
-
-      const filteredDetails = sourceIds.size
-        ? usageDetails.filter((detail) => sourceIds.has(detail.source))
-        : [];
-      cache.set(provider.name, calculateStatusBarData(filteredDetails));
-    });
-
-    return cache;
-  }, [configs, usageDetails]);
+  const toggleProvider = (name: string) => {
+    setExpandedProviders((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
 
   return (
     <>
@@ -84,117 +65,101 @@ export function OpenAISection({
           </Button>
         }
       >
-        <ProviderList<OpenAIProviderConfig>
-          items={configs}
-          loading={loading}
-          keyField={(_, index) => `openai-provider-${index}`}
-          emptyTitle={t('ai_providers.openai_empty_title')}
-          emptyDescription={t('ai_providers.openai_empty_desc')}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          actionsDisabled={actionsDisabled}
-          renderContent={(item) => {
-            const stats = getOpenAIProviderStats(item.apiKeyEntries, keyStats, item.prefix);
-            const headerEntries = Object.entries(item.headers || {});
-            const apiKeyEntries = item.apiKeyEntries || [];
-            const statusData = statusBarCache.get(item.name) || calculateStatusBarData([]);
+        {loading && configs.length === 0 ? (
+          <div className="hint">{t('common.loading')}</div>
+        ) : configs.length === 0 ? (
+          <EmptyState
+            title={t('ai_providers.openai_empty_title')}
+            description={t('ai_providers.openai_empty_desc')}
+          />
+        ) : (
+          <div className={usageStyles.tableWrapper}>
+            <table className={`${usageStyles.table} ${styles.providerTable}`}>
+              <thead>
+                <tr>
+                  <th>{t('ai_providers.openai_add_modal_name_label', { defaultValue: 'Name' })}</th>
+                  <th>{t('common.base_url')}</th>
+                  <th>{t('ai_providers.claude_count')}</th>
+                  <th>{t('ai_providers.claude_key')}</th>
+                  <th>{t('stats.success')}</th>
+                  <th>{t('stats.failure')}</th>
+                  <th>{t('common.priority')}</th>
+                  <th>{t('common.prefix')}</th>
+                  <th>{t('common.actions', { defaultValue: 'Actions' })}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {configs.map((provider, index) => {
+                  const stats = getOpenAIProviderStats(provider.apiKeyEntries, keyStats, provider.prefix);
+                  const isExpanded = !!expandedProviders[provider.name];
+                  const apiKeyEntries = provider.apiKeyEntries || [];
 
-            return (
-              <Fragment>
-                <div className="item-title">{item.name}</div>
-                {item.priority !== undefined && (
-                  <div className={styles.fieldRow}>
-                    <span className={styles.fieldLabel}>{t('common.priority')}:</span>
-                    <span className={styles.fieldValue}>{item.priority}</span>
-                  </div>
-                )}
-                {item.prefix && (
-                  <div className={styles.fieldRow}>
-                    <span className={styles.fieldLabel}>{t('common.prefix')}:</span>
-                    <span className={styles.fieldValue}>{item.prefix}</span>
-                  </div>
-                )}
-                <div className={styles.fieldRow}>
-                  <span className={styles.fieldLabel}>{t('common.base_url')}:</span>
-                  <span className={styles.fieldValue}>{item.baseUrl}</span>
-                </div>
-                {headerEntries.length > 0 && (
-                  <div className={styles.headerBadgeList}>
-                    {headerEntries.map(([key, value]) => (
-                      <span key={key} className={styles.headerBadge}>
-                        <strong>{key}:</strong> {value}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {apiKeyEntries.length > 0 && (
-                  <div className={styles.apiKeyEntriesSection}>
-                    <div className={styles.apiKeyEntriesLabel}>
-                      {t('ai_providers.openai_keys_count')}: {apiKeyEntries.length}
-                    </div>
-                    <div className={styles.apiKeyEntryList}>
-                      {apiKeyEntries.map((entry, entryIndex) => {
-                        const entryStats = getStatsBySource(entry.apiKey, keyStats);
-                        return (
-                          <div key={entryIndex} className={styles.apiKeyEntryCard}>
-                            <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>
-                            <span className={styles.apiKeyEntryKey}>{maskApiKey(entry.apiKey)}</span>
-                            {entry.proxyUrl && (
-                              <span className={styles.apiKeyEntryProxy}>{entry.proxyUrl}</span>
-                            )}
-                            <div className={styles.apiKeyEntryStats}>
-                              <span
-                                className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatSuccess}`}
-                              >
-                                <IconCheck size={12} /> {entryStats.success}
-                              </span>
-                              <span
-                                className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatFailure}`}
-                              >
-                                <IconX size={12} /> {entryStats.failure}
-                              </span>
-                            </div>
+                  return (
+                    <Fragment key={`openai-${index}`}>
+                      <tr
+                        className={styles.providerTableRowMerged}
+                        onClick={() => toggleProvider(provider.name)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td>{provider.name}</td>
+                        <td>{provider.baseUrl}</td>
+                        <td>{apiKeyEntries.length}</td>
+                        <td></td>
+                        <td>{stats.success}</td>
+                        <td>{stats.failure}</td>
+                        <td>{provider.priority ?? ''}</td>
+                        <td>{provider.prefix ?? ''}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onEdit(index)}
+                              disabled={actionsDisabled}
+                            >
+                              {t('common.edit')}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              style={{ color: 'var(--danger-color, #ef4444)' }}
+                              size="sm"
+                              onClick={() => onDelete(index)}
+                              disabled={actionsDisabled}
+                            >
+                              {t('common.delete')}
+                            </Button>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <div className={styles.fieldRow} style={{ marginTop: '8px' }}>
-                  <span className={styles.fieldLabel}>{t('ai_providers.openai_models_count')}:</span>
-                  <span className={styles.fieldValue}>{item.models?.length || 0}</span>
-                </div>
-                {item.models?.length ? (
-                  <div className={styles.modelTagList}>
-                    {item.models.map((model) => (
-                      <span key={model.name} className={styles.modelTag}>
-                        <span className={styles.modelName}>{model.name}</span>
-                        {model.alias && model.alias !== model.name && (
-                          <span className={styles.modelAlias}>{model.alias}</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                {item.testModel && (
-                  <div className={styles.fieldRow}>
-                    <span className={styles.fieldLabel}>Test Model:</span>
-                    <span className={styles.fieldValue}>{item.testModel}</span>
-                  </div>
-                )}
-                <div className={styles.cardStats}>
-                  <span className={`${styles.statPill} ${styles.statSuccess}`}>
-                    {t('stats.success')}: {stats.success}
-                  </span>
-                  <span className={`${styles.statPill} ${styles.statFailure}`}>
-                    {t('stats.failure')}: {stats.failure}
-                  </span>
-                </div>
-                <ProviderStatusBar statusData={statusData} />
-              </Fragment>
-            );
-          }}
-        />
+                        </td>
+                      </tr>
+                      {isExpanded &&
+                        apiKeyEntries.map((entry, entryIndex) => {
+                          const entryStats = getStatsBySource(entry.apiKey, keyStats);
+                          return (
+                            <tr
+                              key={`openai-${index}-entry-${entryIndex}`}
+                              className={styles.providerTableRowChild}
+                            >
+                              <td />
+                              <td>{entry.proxyUrl ?? ''}</td>
+                              <td></td>
+                              <td className={styles.providerTableKeyCell} title={entry.apiKey}>
+                                {maskApiKeyCompact(entry.apiKey)}
+                              </td>
+                              <td>{entryStats.success}</td>
+                              <td>{entryStats.failure}</td>
+                              <td></td>
+                              <td></td>
+                              <td></td>
+                            </tr>
+                          );
+                        })}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </>
   );

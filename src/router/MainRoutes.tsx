@@ -39,6 +39,14 @@ const mainRoutes = [
     ],
   },
   {
+    path: '/ai-providers/claude/group-edit',
+    element: <AiProvidersClaudeEditLayout />,
+    children: [
+      { index: true, element: <AiProvidersClaudeEditPage /> },
+      { path: 'models', element: <AiProvidersClaudeModelsPage /> },
+    ],
+  },
+  {
     path: '/ai-providers/claude/:index',
     element: <AiProvidersClaudeEditLayout />,
     children: [

@@ -21,7 +21,7 @@ import type { GeminiFormState } from '@/components/providers';
 import layoutStyles from './AiProvidersEditLayout.module.scss';
 import styles from './AiProvidersPage.module.scss';
 
-type LocationState = { fromAiProviders?: boolean } | null;
+type LocationState = { fromAiProviders?: boolean; keyOnly?: boolean; groupIndices?: number[] } | null;
 
 const buildEmptyForm = (): GeminiFormState => ({
   apiKey: '',
@@ -101,19 +101,36 @@ export function AiProvidersGeminiEditPage() {
   const autoFetchSignatureRef = useRef<string>('');
   const modelDiscoveryRequestIdRef = useRef(0);
 
-  const hasIndexParam = typeof params.index === 'string';
-  const editIndex = useMemo(() => parseIndexParam(params.index), [params.index]);
+  const locationState = location.state as LocationState;
+  const keyOnly = Boolean(locationState?.keyOnly);
+  const groupIndices: number[] =
+    Array.isArray(locationState?.groupIndices) && locationState.groupIndices!.length > 0
+      ? locationState.groupIndices!
+      : [];
+  const isGroupEdit = groupIndices.length > 0;
+
+  const hasIndexParam = !isGroupEdit && typeof params.index === 'string';
+  const editIndex = useMemo(
+    () => (isGroupEdit ? null : parseIndexParam(params.index)),
+    [isGroupEdit, params.index]
+  );
   const invalidIndexParam = hasIndexParam && editIndex === null;
 
   const initialData = useMemo(() => {
+    if (isGroupEdit) return configs[groupIndices[0]];
     if (editIndex === null) return undefined;
     return configs[editIndex];
-  }, [configs, editIndex]);
+  }, [configs, editIndex, isGroupEdit, groupIndices]);
 
-  const invalidIndex = editIndex !== null && !initialData;
+  const invalidIndex = isGroupEdit
+    ? groupIndices.length === 0 || !configs[groupIndices[0]]
+    : editIndex !== null && !initialData;
 
-  const title =
-    editIndex !== null ? t('ai_providers.gemini_edit_modal_title') : t('ai_providers.gemini_add_modal_title');
+  const title = isGroupEdit
+    ? t('ai_providers.gemini_edit_modal_title')
+    : editIndex !== null
+      ? t('ai_providers.gemini_edit_modal_title')
+      : t('ai_providers.gemini_add_modal_title');
 
   const handleBack = useCallback(() => {
     const state = location.state as LocationState;
@@ -354,27 +371,45 @@ export function AiProvidersGeminiEditPage() {
         name: stripGeminiModelResourceName(entry.name),
       }));
 
-      const payload: GeminiKeyConfig = {
-        apiKey: form.apiKey.trim(),
-        priority: form.priority !== undefined ? Math.trunc(form.priority) : undefined,
-        prefix: form.prefix?.trim() || undefined,
-        baseUrl: form.baseUrl?.trim() || undefined,
-        proxyUrl: form.proxyUrl?.trim() || undefined,
-        headers: buildHeaderObject(form.headers),
-        models: entriesToModels(normalizedModelEntries),
-        excludedModels: parseExcludedModels(form.excludedText),
-      };
+      let nextList: GeminiKeyConfig[];
 
-      const nextList =
-        editIndex !== null
-          ? configs.map((item, idx) => (idx === editIndex ? payload : item))
-          : [...configs, payload];
+      if (isGroupEdit && groupIndices.length > 0) {
+        const sharedPayload = {
+          baseUrl: form.baseUrl?.trim() || undefined,
+          proxyUrl: form.proxyUrl?.trim() || undefined,
+          headers: buildHeaderObject(form.headers),
+          models: entriesToModels(normalizedModelEntries),
+          excludedModels: parseExcludedModels(form.excludedText),
+        };
+        nextList = configs.map((item, idx) =>
+          groupIndices.includes(idx) ? { ...item, ...sharedPayload } : item
+        );
+      } else {
+        const payload: GeminiKeyConfig = {
+          apiKey: form.apiKey.trim(),
+          priority: form.priority !== undefined ? Math.trunc(form.priority) : undefined,
+          prefix: form.prefix?.trim() || undefined,
+          baseUrl: form.baseUrl?.trim() || undefined,
+          proxyUrl: form.proxyUrl?.trim() || undefined,
+          headers: buildHeaderObject(form.headers),
+          models: entriesToModels(normalizedModelEntries),
+          excludedModels: parseExcludedModels(form.excludedText),
+        };
+        nextList =
+          editIndex !== null
+            ? configs.map((item, idx) => (idx === editIndex ? payload : item))
+            : [...configs, payload];
+      }
 
       await providersApi.saveGeminiKeys(nextList);
       updateConfigValue('gemini-api-key', nextList);
       clearCache('gemini-api-key');
       showNotification(
-        editIndex !== null ? t('notification.gemini_key_updated') : t('notification.gemini_key_added'),
+        isGroupEdit
+          ? t('notification.gemini_key_updated')
+          : editIndex !== null
+            ? t('notification.gemini_key_updated')
+            : t('notification.gemini_key_added'),
         'success'
       );
       allowNextNavigation();
@@ -394,7 +429,9 @@ export function AiProvidersGeminiEditPage() {
     configs,
     editIndex,
     form,
+    groupIndices,
     handleBack,
+    isGroupEdit,
     showNotification,
     t,
     updateConfigValue,
@@ -443,119 +480,135 @@ export function AiProvidersGeminiEditPage() {
           <div className="hint">{t('common.invalid_provider_index')}</div>
         ) : (
           <>
-            <Input
-              label={t('ai_providers.gemini_add_modal_key_label')}
-              placeholder={t('ai_providers.gemini_add_modal_key_placeholder')}
-              value={form.apiKey}
-              onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-              disabled={disableControls || saving}
-            />
-            <Input
-              label={t('ai_providers.priority_label')}
-              hint={t('ai_providers.priority_hint')}
-              type="number"
-              step={1}
-              value={form.priority ?? ''}
-              onChange={(e) => {
-                const raw = e.target.value;
-                const parsed = raw.trim() === '' ? undefined : Number(raw);
-                setForm((prev) => ({
-                  ...prev,
-                  priority: parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined,
-                }));
-              }}
-              disabled={disableControls || saving}
-            />
-            <Input
-              label={t('ai_providers.prefix_label')}
-              placeholder={t('ai_providers.prefix_placeholder')}
-              value={form.prefix ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))}
-              hint={t('ai_providers.prefix_hint')}
-              disabled={disableControls || saving}
-            />
-            <Input
-              label={t('ai_providers.gemini_base_url_label')}
-              placeholder={t('ai_providers.gemini_base_url_placeholder')}
-              value={form.baseUrl ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
-              disabled={disableControls || saving}
-            />
-            <Input
-              label={t('ai_providers.gemini_add_modal_proxy_label')}
-              placeholder={t('ai_providers.gemini_add_modal_proxy_placeholder')}
-              value={form.proxyUrl ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, proxyUrl: e.target.value }))}
-              disabled={disableControls || saving}
-            />
-            <HeaderInputList
-              entries={form.headers}
-              onChange={(entries) => setForm((prev) => ({ ...prev, headers: entries }))}
-              addLabel={t('common.custom_headers_add')}
-              keyPlaceholder={t('common.custom_headers_key_placeholder')}
-              valuePlaceholder={t('common.custom_headers_value_placeholder')}
-              removeButtonTitle={t('common.delete')}
-              removeButtonAriaLabel={t('common.delete')}
-              disabled={disableControls || saving}
-            />
-
-            <div className={styles.modelConfigSection}>
-              <div className={styles.modelConfigHeader}>
-                <label className={styles.modelConfigTitle}>{t('ai_providers.gemini_models_label')}</label>
-                <div className={styles.modelConfigToolbar}>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        modelEntries: [...prev.modelEntries, { name: '', alias: '' }],
-                      }))
-                    }
-                    disabled={disableControls || saving}
-                  >
-                    {t('ai_providers.gemini_models_add_btn')}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setModelDiscoveryOpen(true)}
-                    disabled={!canOpenModelDiscovery}
-                  >
-                    {t('ai_providers.gemini_models_fetch_button')}
-                  </Button>
-                </div>
-              </div>
-              <div className={styles.sectionHint}>{t('ai_providers.gemini_models_hint')}</div>
-
-              <ModelInputList
-                entries={form.modelEntries}
-                onChange={(entries) => setForm((prev) => ({ ...prev, modelEntries: entries }))}
-                namePlaceholder={t('common.model_name_placeholder')}
-                aliasPlaceholder={t('common.model_alias_placeholder')}
+            {!isGroupEdit && (
+              <Input
+                label={t('ai_providers.gemini_add_modal_key_label')}
+                placeholder={t('ai_providers.gemini_add_modal_key_placeholder')}
+                value={form.apiKey}
+                onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
                 disabled={disableControls || saving}
-                hideAddButton
-                className={styles.modelInputList}
-                rowClassName={styles.modelInputRow}
-                inputClassName={styles.modelInputField}
-                removeButtonClassName={styles.modelRowRemoveButton}
+              />
+            )}
+            {!isGroupEdit && (
+              <Input
+                label={t('ai_providers.priority_label')}
+                hint={t('ai_providers.priority_hint')}
+                type="number"
+                step={1}
+                value={form.priority ?? ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const parsed = raw.trim() === '' ? undefined : Number(raw);
+                  setForm((prev) => ({
+                    ...prev,
+                    priority: parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined,
+                  }));
+                }}
+                disabled={disableControls || saving}
+              />
+            )}
+            {!isGroupEdit && (
+              <Input
+                label={t('ai_providers.prefix_label')}
+                placeholder={t('ai_providers.prefix_placeholder')}
+                value={form.prefix ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))}
+                hint={t('ai_providers.prefix_hint')}
+                disabled={disableControls || saving}
+              />
+            )}
+            {!keyOnly && (
+              <Input
+                label={t('ai_providers.gemini_base_url_label')}
+                placeholder={t('ai_providers.gemini_base_url_placeholder')}
+                value={form.baseUrl ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                disabled={disableControls || saving}
+              />
+            )}
+            {!keyOnly && (
+              <Input
+                label={t('ai_providers.gemini_add_modal_proxy_label')}
+                placeholder={t('ai_providers.gemini_add_modal_proxy_placeholder')}
+                value={form.proxyUrl ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, proxyUrl: e.target.value }))}
+                disabled={disableControls || saving}
+              />
+            )}
+            {!keyOnly && (
+              <HeaderInputList
+                entries={form.headers}
+                onChange={(entries) => setForm((prev) => ({ ...prev, headers: entries }))}
+                addLabel={t('common.custom_headers_add')}
+                keyPlaceholder={t('common.custom_headers_key_placeholder')}
+                valuePlaceholder={t('common.custom_headers_value_placeholder')}
                 removeButtonTitle={t('common.delete')}
                 removeButtonAriaLabel={t('common.delete')}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>{t('ai_providers.excluded_models_label')}</label>
-              <textarea
-                className="input"
-                placeholder={t('ai_providers.excluded_models_placeholder')}
-                value={form.excludedText}
-                onChange={(e) => setForm((prev) => ({ ...prev, excludedText: e.target.value }))}
-                rows={4}
                 disabled={disableControls || saving}
               />
-              <div className="hint">{t('ai_providers.excluded_models_hint')}</div>
-            </div>
+            )}
+
+            {!keyOnly && (
+              <div className={styles.modelConfigSection}>
+                <div className={styles.modelConfigHeader}>
+                  <label className={styles.modelConfigTitle}>{t('ai_providers.gemini_models_label')}</label>
+                  <div className={styles.modelConfigToolbar}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          modelEntries: [...prev.modelEntries, { name: '', alias: '' }],
+                        }))
+                      }
+                      disabled={disableControls || saving}
+                    >
+                      {t('ai_providers.gemini_models_add_btn')}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setModelDiscoveryOpen(true)}
+                      disabled={!canOpenModelDiscovery}
+                    >
+                      {t('ai_providers.gemini_models_fetch_button')}
+                    </Button>
+                  </div>
+                </div>
+                <div className={styles.sectionHint}>{t('ai_providers.gemini_models_hint')}</div>
+
+                <ModelInputList
+                  entries={form.modelEntries}
+                  onChange={(entries) => setForm((prev) => ({ ...prev, modelEntries: entries }))}
+                  namePlaceholder={t('common.model_name_placeholder')}
+                  aliasPlaceholder={t('common.model_alias_placeholder')}
+                  disabled={disableControls || saving}
+                  hideAddButton
+                  className={styles.modelInputList}
+                  rowClassName={styles.modelInputRow}
+                  inputClassName={styles.modelInputField}
+                  removeButtonClassName={styles.modelRowRemoveButton}
+                  removeButtonTitle={t('common.delete')}
+                  removeButtonAriaLabel={t('common.delete')}
+                />
+              </div>
+            )}
+
+            {!keyOnly && (
+              <div className="form-group">
+                <label>{t('ai_providers.excluded_models_label')}</label>
+                <textarea
+                  className="input"
+                  placeholder={t('ai_providers.excluded_models_placeholder')}
+                  value={form.excludedText}
+                  onChange={(e) => setForm((prev) => ({ ...prev, excludedText: e.target.value }))}
+                  rows={4}
+                  disabled={disableControls || saving}
+                />
+                <div className="hint">{t('ai_providers.excluded_models_hint')}</div>
+              </div>
+            )}
 
             <Modal
               open={modelDiscoveryOpen}

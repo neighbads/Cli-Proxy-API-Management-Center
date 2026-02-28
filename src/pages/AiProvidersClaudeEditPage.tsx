@@ -47,6 +47,7 @@ export function AiProvidersClaudeEditPage() {
   const { showNotification } = useNotificationStore();
   const {
     hasIndexParam,
+    editMode,
     invalidIndexParam,
     invalidIndex,
     disableControls,
@@ -65,9 +66,14 @@ export function AiProvidersClaudeEditPage() {
     handleSave,
   } = useOutletContext<ClaudeEditOutletContext>();
 
-  const title = hasIndexParam
-    ? t('ai_providers.claude_edit_modal_title')
-    : t('ai_providers.claude_add_modal_title');
+  const isGroupEdit = editMode === 'group';
+  const keyOnly = useOutletContext<ClaudeEditOutletContext>().keyOnly;
+
+  const title = isGroupEdit
+    ? t('ai_providers.claude_group_edit_title', { defaultValue: 'Edit group (shared options)' })
+    : hasIndexParam
+      ? t('ai_providers.claude_edit_modal_title')
+      : t('ai_providers.claude_add_modal_title');
 
   const swipeRef = useEdgeSwipeBack({ onBack: handleBack });
   const [isTesting, setIsTesting] = useState(false);
@@ -303,47 +309,51 @@ export function AiProvidersClaudeEditPage() {
           <div className={styles.sectionHint}>{t('common.invalid_provider_index')}</div>
         ) : (
           <div className={styles.openaiEditForm}>
-            <Input
-              label={t('ai_providers.claude_add_modal_key_label')}
-              value={form.apiKey}
-              onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-              disabled={saving || disableControls || isTesting}
-            />
-            <Input
-              label={t('ai_providers.priority_label')}
-              hint={t('ai_providers.priority_hint')}
-              type="number"
-              step={1}
-              value={form.priority ?? ''}
-              onChange={(e) => {
-                const raw = e.target.value;
-                const parsed = raw.trim() === '' ? undefined : Number(raw);
-                setForm((prev) => ({
-                  ...prev,
-                  priority: parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined,
-                }));
-              }}
-              disabled={saving || disableControls || isTesting}
-            />
-            <Input
-              label={t('ai_providers.prefix_label')}
-              placeholder={t('ai_providers.prefix_placeholder')}
-              value={form.prefix ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))}
-              hint={t('ai_providers.prefix_hint')}
-              disabled={saving || disableControls || isTesting}
-            />
+            {!isGroupEdit && (
+              <>
+                <Input
+                  label={t('ai_providers.claude_add_modal_key_label')}
+                  value={form.apiKey}
+                  onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
+                  disabled={saving || disableControls || isTesting}
+                />
+                <Input
+                  label={t('ai_providers.priority_label')}
+                  hint={t('ai_providers.priority_hint')}
+                  type="number"
+                  step={1}
+                  value={form.priority ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const parsed = raw.trim() === '' ? undefined : Number(raw);
+                    setForm((prev) => ({
+                      ...prev,
+                      priority: parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined,
+                    }));
+                  }}
+                  disabled={saving || disableControls || isTesting}
+                />
+                <Input
+                  label={t('ai_providers.prefix_label')}
+                  placeholder={t('ai_providers.prefix_placeholder')}
+                  value={form.prefix ?? ''}
+                  onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))}
+                  hint={t('ai_providers.prefix_hint')}
+                  disabled={saving || disableControls || isTesting}
+                />
+              </>
+            )}
             <Input
               label={t('ai_providers.claude_add_modal_url_label')}
               value={form.baseUrl ?? ''}
               onChange={(e) => setForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
-              disabled={saving || disableControls || isTesting}
+              disabled={saving || disableControls || isTesting || keyOnly}
             />
             <Input
               label={t('ai_providers.claude_add_modal_proxy_label')}
               value={form.proxyUrl ?? ''}
               onChange={(e) => setForm((prev) => ({ ...prev, proxyUrl: e.target.value }))}
-              disabled={saving || disableControls || isTesting}
+              disabled={saving || disableControls || isTesting || keyOnly}
             />
             <HeaderInputList
               entries={form.headers}
@@ -353,7 +363,7 @@ export function AiProvidersClaudeEditPage() {
               valuePlaceholder={t('common.custom_headers_value_placeholder')}
               removeButtonTitle={t('common.delete')}
               removeButtonAriaLabel={t('common.delete')}
-              disabled={saving || disableControls || isTesting}
+              disabled={saving || disableControls || isTesting || keyOnly}
             />
 
             <div className={styles.modelConfigSection}>
@@ -369,7 +379,7 @@ export function AiProvidersClaudeEditPage() {
                         modelEntries: [...prev.modelEntries, { name: '', alias: '' }],
                       }))
                     }
-                    disabled={saving || disableControls || isTesting}
+                    disabled={saving || disableControls || isTesting || keyOnly}
                   >
                     {t('ai_providers.claude_models_add_btn')}
                   </Button>
@@ -377,7 +387,7 @@ export function AiProvidersClaudeEditPage() {
                     variant="secondary"
                     size="sm"
                     onClick={openClaudeModelDiscovery}
-                    disabled={saving || disableControls || isTesting}
+                    disabled={saving || disableControls || isTesting || keyOnly}
                   >
                     {t('ai_providers.claude_models_fetch_button')}
                   </Button>
@@ -391,7 +401,7 @@ export function AiProvidersClaudeEditPage() {
                 onChange={(entries) => setForm((prev) => ({ ...prev, modelEntries: entries }))}
                 namePlaceholder={t('common.model_name_placeholder')}
                 aliasPlaceholder={t('common.model_alias_placeholder')}
-                disabled={saving || disableControls || isTesting}
+                disabled={saving || disableControls || isTesting || keyOnly}
                 hideAddButton
                 className={styles.modelInputList}
                 rowClassName={styles.modelInputRow}
@@ -472,7 +482,7 @@ export function AiProvidersClaudeEditPage() {
                 value={form.excludedText}
                 onChange={(e) => setForm((prev) => ({ ...prev, excludedText: e.target.value }))}
                 rows={4}
-                disabled={saving || disableControls || isTesting}
+                disabled={saving || disableControls || isTesting || keyOnly}
               />
               <div className="hint">{t('ai_providers.excluded_models_hint')}</div>
             </div>
@@ -506,7 +516,7 @@ export function AiProvidersClaudeEditPage() {
                         };
                       })
                     }
-                    disabled={saving || disableControls || isTesting}
+                    disabled={saving || disableControls || isTesting || keyOnly}
                     ariaLabel={t('ai_providers.claude_cloak_toggle_aria')}
                     label={t('ai_providers.claude_cloak_toggle_label')}
                   />
@@ -531,7 +541,7 @@ export function AiProvidersClaudeEditPage() {
                         }))
                       }
                       ariaLabel={t('ai_providers.claude_cloak_mode_label')}
-                      disabled={saving || disableControls || isTesting}
+                      disabled={saving || disableControls || isTesting || keyOnly}
                     />
                     <div className="hint">{t('ai_providers.claude_cloak_mode_hint')}</div>
                   </div>
@@ -549,7 +559,7 @@ export function AiProvidersClaudeEditPage() {
                           },
                         }))
                       }
-                      disabled={saving || disableControls || isTesting}
+                      disabled={saving || disableControls || isTesting || keyOnly}
                       ariaLabel={t('ai_providers.claude_cloak_strict_label')}
                     />
                     <div className="hint">{t('ai_providers.claude_cloak_strict_hint')}</div>
@@ -572,7 +582,7 @@ export function AiProvidersClaudeEditPage() {
                         }));
                       }}
                       rows={3}
-                      disabled={saving || disableControls || isTesting}
+                      disabled={saving || disableControls || isTesting || keyOnly}
                     />
                     <div className="hint">{t('ai_providers.claude_cloak_sensitive_words_hint')}</div>
                   </div>

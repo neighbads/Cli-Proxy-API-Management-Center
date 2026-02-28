@@ -12,13 +12,18 @@ import { buildHeaderObject, headersToEntries, normalizeHeaderEntries } from '@/u
 import { excludedModelsToText, parseExcludedModels } from '@/components/providers/utils';
 import { modelsToEntries } from '@/components/ui/modelInputListUtils';
 
-type LocationState = { fromAiProviders?: boolean } | null;
+type LocationState = { fromAiProviders?: boolean; groupIndices?: number[]; keyOnly?: boolean } | null;
 
 type TestStatus = 'idle' | 'loading' | 'success' | 'error';
+
+export type ClaudeEditMode = 'new' | 'single' | 'group';
 
 export type ClaudeEditOutletContext = {
   hasIndexParam: boolean;
   editIndex: number | null;
+  editMode: ClaudeEditMode;
+  groupIndices: number[];
+  keyOnly: boolean;
   invalidIndexParam: boolean;
   invalidIndex: boolean;
   disableControls: boolean;
@@ -110,8 +115,23 @@ export function AiProvidersClaudeEditLayout() {
   const { showNotification } = useNotificationStore();
 
   const params = useParams<{ index?: string }>();
-  const hasIndexParam = typeof params.index === 'string';
-  const editIndex = useMemo(() => parseIndexParam(params.index), [params.index]);
+  const pathname = location.pathname;
+  const locationState = location.state as LocationState;
+  const isGroupEdit =
+    pathname === '/ai-providers/claude/group-edit' &&
+    Array.isArray(locationState?.groupIndices) &&
+    locationState.groupIndices!.length > 0;
+  const groupIndices = useMemo(
+    () => (isGroupEdit && locationState?.groupIndices ? locationState.groupIndices : []),
+    [isGroupEdit, locationState?.groupIndices]
+  );
+  const keyOnly = Boolean(locationState?.keyOnly);
+
+  const hasIndexParam = typeof params.index === 'string' && !isGroupEdit;
+  const editIndex = useMemo(
+    () => (isGroupEdit ? null : parseIndexParam(params.index)),
+    [isGroupEdit, params.index]
+  );
   const invalidIndexParam = hasIndexParam && editIndex === null;
 
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
@@ -129,9 +149,10 @@ export function AiProvidersClaudeEditLayout() {
 
   const draftKey = useMemo(() => {
     if (invalidIndexParam) return `claude:invalid:${params.index ?? 'unknown'}`;
+    if (isGroupEdit) return `claude:group:${groupIndices.join(',')}`;
     if (editIndex === null) return 'claude:new';
     return `claude:${editIndex}`;
-  }, [editIndex, invalidIndexParam, params.index]);
+  }, [editIndex, invalidIndexParam, isGroupEdit, groupIndices, params.index]);
 
   const draft = useClaudeEditDraftStore((state) => state.drafts[draftKey]);
   const acquireDraft = useClaudeEditDraftStore((state) => state.acquireDraft);
@@ -177,11 +198,15 @@ export function AiProvidersClaudeEditLayout() {
   );
 
   const initialData = useMemo(() => {
+    if (isGroupEdit && groupIndices.length > 0) return configs[groupIndices[0]];
     if (editIndex === null) return undefined;
     return configs[editIndex];
-  }, [configs, editIndex]);
+  }, [configs, editIndex, isGroupEdit, groupIndices]);
 
-  const invalidIndex = editIndex !== null && !initialData;
+  const invalidIndex = useMemo(() => {
+    if (isGroupEdit) return groupIndices.length === 0 || !configs[groupIndices[0]];
+    return editIndex !== null && !initialData;
+  }, [configs, editIndex, initialData, isGroupEdit, groupIndices]);
 
   const availableModels = useMemo(
     () => form.modelEntries.map((entry) => entry.name.trim()).filter(Boolean),
@@ -351,10 +376,7 @@ export function AiProvidersClaudeEditLayout() {
 
     setSaving(true);
     try {
-      const payload: ProviderKeyConfig = {
-        apiKey: form.apiKey.trim(),
-        priority: form.priority !== undefined ? Math.trunc(form.priority) : undefined,
-        prefix: form.prefix?.trim() || undefined,
+      const sharedPayload: Omit<ProviderKeyConfig, 'apiKey' | 'priority' | 'prefix'> = {
         baseUrl: (form.baseUrl ?? '').trim() || undefined,
         proxyUrl: form.proxyUrl?.trim() || undefined,
         headers: buildHeaderObject(form.headers),
@@ -370,19 +392,42 @@ export function AiProvidersClaudeEditLayout() {
         cloak: form.cloak,
       };
 
-      const nextList =
-        editIndex !== null
-          ? configs.map((item, idx) => (idx === editIndex ? payload : item))
-          : [...configs, payload];
+      let nextList: ProviderKeyConfig[];
+
+      if (isGroupEdit && groupIndices.length > 0) {
+        nextList = configs.map((item, idx) =>
+          groupIndices.includes(idx)
+            ? { ...sharedPayload, apiKey: item.apiKey, priority: item.priority, prefix: item.prefix }
+            : item
+        );
+      } else if (editIndex !== null) {
+        const payload: ProviderKeyConfig = {
+          ...sharedPayload,
+          apiKey: form.apiKey.trim(),
+          priority: form.priority !== undefined ? Math.trunc(form.priority) : undefined,
+          prefix: form.prefix?.trim() || undefined,
+        };
+        nextList = configs.map((item, idx) => (idx === editIndex ? payload : item));
+      } else {
+        const payload: ProviderKeyConfig = {
+          ...sharedPayload,
+          apiKey: form.apiKey.trim(),
+          priority: form.priority !== undefined ? Math.trunc(form.priority) : undefined,
+          prefix: form.prefix?.trim() || undefined,
+        };
+        nextList = [...configs, payload];
+      }
 
       await providersApi.saveClaudeConfigs(nextList);
       setConfigs(nextList);
       updateConfigValue('claude-api-key', nextList);
       clearCache('claude-api-key');
-      showNotification(
-        editIndex !== null ? t('notification.claude_config_updated') : t('notification.claude_config_added'),
-        'success'
-      );
+      const message = isGroupEdit
+        ? t('notification.claude_group_updated', { defaultValue: 'Group config updated' })
+        : editIndex !== null
+          ? t('notification.claude_config_updated')
+          : t('notification.claude_config_added');
+      showNotification(message, 'success');
       allowNextNavigation();
       setDraftBaselineSignature(draftKey, buildClaudeSignature(form));
       handleBack();
@@ -399,9 +444,11 @@ export function AiProvidersClaudeEditLayout() {
     disableControls,
     editIndex,
     form,
+    groupIndices,
     handleBack,
     invalidIndex,
     invalidIndexParam,
+    isGroupEdit,
     resolvedLoading,
     setDraftBaselineSignature,
     saving,
@@ -410,11 +457,16 @@ export function AiProvidersClaudeEditLayout() {
     updateConfigValue,
   ]);
 
+  const editMode: ClaudeEditMode = isGroupEdit ? 'group' : editIndex !== null ? 'single' : 'new';
+
   return (
     <Outlet
       context={{
         hasIndexParam,
         editIndex,
+        editMode,
+        groupIndices,
+        keyOnly,
         invalidIndexParam,
         invalidIndex,
         disableControls,

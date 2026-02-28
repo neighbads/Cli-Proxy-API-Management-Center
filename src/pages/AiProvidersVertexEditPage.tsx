@@ -17,7 +17,7 @@ import { buildHeaderObject, headersToEntries, normalizeHeaderEntries } from '@/u
 import type { VertexFormState } from '@/components/providers';
 import layoutStyles from './AiProvidersEditLayout.module.scss';
 
-type LocationState = { fromAiProviders?: boolean } | null;
+type LocationState = { fromAiProviders?: boolean; keyOnly?: boolean; groupIndices?: number[] } | null;
 
 const buildEmptyForm = (): VertexFormState => ({
   apiKey: '',
@@ -77,19 +77,36 @@ export function AiProvidersVertexEditPage() {
   const [form, setForm] = useState<VertexFormState>(() => buildEmptyForm());
   const [baselineSignature, setBaselineSignature] = useState(() => buildVertexSignature(buildEmptyForm()));
 
-  const hasIndexParam = typeof params.index === 'string';
-  const editIndex = useMemo(() => parseIndexParam(params.index), [params.index]);
+  const locationState = location.state as LocationState;
+  const keyOnly = Boolean(locationState?.keyOnly);
+  const groupIndices: number[] =
+    Array.isArray(locationState?.groupIndices) && locationState.groupIndices!.length > 0
+      ? locationState.groupIndices!
+      : [];
+  const isGroupEdit = groupIndices.length > 0;
+
+  const hasIndexParam = !isGroupEdit && typeof params.index === 'string';
+  const editIndex = useMemo(
+    () => (isGroupEdit ? null : parseIndexParam(params.index)),
+    [isGroupEdit, params.index]
+  );
   const invalidIndexParam = hasIndexParam && editIndex === null;
 
   const initialData = useMemo(() => {
+    if (isGroupEdit) return configs[groupIndices[0]];
     if (editIndex === null) return undefined;
     return configs[editIndex];
-  }, [configs, editIndex]);
+  }, [configs, editIndex, isGroupEdit, groupIndices]);
 
-  const invalidIndex = editIndex !== null && !initialData;
+  const invalidIndex = isGroupEdit
+    ? groupIndices.length === 0 || !configs[groupIndices[0]]
+    : editIndex !== null && !initialData;
 
-  const title =
-    editIndex !== null ? t('ai_providers.vertex_edit_modal_title') : t('ai_providers.vertex_add_modal_title');
+  const title = isGroupEdit
+    ? t('ai_providers.vertex_edit_modal_title')
+    : editIndex !== null
+      ? t('ai_providers.vertex_edit_modal_title')
+      : t('ai_providers.vertex_add_modal_title');
 
   const handleBack = useCallback(() => {
     const state = location.state as LocationState;
@@ -187,7 +204,7 @@ export function AiProvidersVertexEditPage() {
 
     const trimmedBaseUrl = (form.baseUrl ?? '').trim();
     const baseUrl = trimmedBaseUrl || undefined;
-    if (!baseUrl) {
+    if (!keyOnly && !isGroupEdit && !baseUrl) {
       showNotification(t('notification.vertex_base_url_required'), 'error');
       return;
     }
@@ -195,36 +212,55 @@ export function AiProvidersVertexEditPage() {
     setSaving(true);
     setError('');
     try {
-      const payload: ProviderKeyConfig = {
-        apiKey: form.apiKey.trim(),
-        priority:
-          form.priority !== undefined && Number.isFinite(form.priority)
-            ? Math.trunc(form.priority)
-            : undefined,
-        prefix: form.prefix?.trim() || undefined,
-        baseUrl,
-        proxyUrl: form.proxyUrl?.trim() || undefined,
-        headers: buildHeaderObject(form.headers),
-        models: form.modelEntries
-          .map((entry) => {
-            const name = entry.name.trim();
-            const alias = entry.alias.trim();
-            if (!name || !alias) return null;
-            return { name, alias };
-          })
-          .filter(Boolean) as ProviderKeyConfig['models'],
-      };
+      const modelList = form.modelEntries
+        .map((entry) => {
+          const name = entry.name.trim();
+          const alias = entry.alias.trim();
+          if (!name || !alias) return null;
+          return { name, alias };
+        })
+        .filter(Boolean) as ProviderKeyConfig['models'];
 
-      const nextList =
-        editIndex !== null
-          ? configs.map((item, idx) => (idx === editIndex ? payload : item))
-          : [...configs, payload];
+      let nextList: ProviderKeyConfig[];
+
+      if (isGroupEdit && groupIndices.length > 0) {
+        const sharedPayload = {
+          baseUrl,
+          proxyUrl: form.proxyUrl?.trim() || undefined,
+          headers: buildHeaderObject(form.headers),
+          models: modelList,
+        };
+        nextList = configs.map((item, idx) =>
+          groupIndices.includes(idx) ? { ...item, ...sharedPayload } : item
+        );
+      } else {
+        const payload: ProviderKeyConfig = {
+          apiKey: form.apiKey.trim(),
+          priority:
+            form.priority !== undefined && Number.isFinite(form.priority)
+              ? Math.trunc(form.priority)
+              : undefined,
+          prefix: form.prefix?.trim() || undefined,
+          baseUrl,
+          proxyUrl: form.proxyUrl?.trim() || undefined,
+          headers: buildHeaderObject(form.headers),
+          models: modelList,
+        };
+        nextList =
+          editIndex !== null
+            ? configs.map((item, idx) => (idx === editIndex ? payload : item))
+            : [...configs, payload];
+      }
 
       await providersApi.saveVertexConfigs(nextList);
       updateConfigValue('vertex-api-key', nextList);
       clearCache('vertex-api-key');
       showNotification(
-        editIndex !== null ? t('notification.vertex_config_updated') : t('notification.vertex_config_added'),
+        isGroupEdit
+          ? t('notification.vertex_config_updated')
+          : editIndex !== null
+            ? t('notification.vertex_config_updated')
+            : t('notification.vertex_config_added'),
         'success'
       );
       allowNextNavigation();
@@ -244,7 +280,10 @@ export function AiProvidersVertexEditPage() {
     configs,
     editIndex,
     form,
+    groupIndices,
     handleBack,
+    isGroupEdit,
+    keyOnly,
     showNotification,
     t,
     updateConfigValue,
@@ -290,59 +329,71 @@ export function AiProvidersVertexEditPage() {
           <div className="hint">{t('common.invalid_provider_index')}</div>
         ) : (
           <>
-            <Input
-              label={t('ai_providers.vertex_add_modal_key_label')}
-              placeholder={t('ai_providers.vertex_add_modal_key_placeholder')}
-              value={form.apiKey}
-              onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-              disabled={disableControls || saving}
-            />
-            <Input
-              label={t('ai_providers.prefix_label')}
-              placeholder={t('ai_providers.prefix_placeholder')}
-              value={form.prefix ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))}
-              hint={t('ai_providers.prefix_hint')}
-              disabled={disableControls || saving}
-            />
-            <Input
-              label={t('ai_providers.vertex_add_modal_url_label')}
-              placeholder={t('ai_providers.vertex_add_modal_url_placeholder')}
-              value={form.baseUrl ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
-              disabled={disableControls || saving}
-            />
-            <Input
-              label={t('ai_providers.vertex_add_modal_proxy_label')}
-              placeholder={t('ai_providers.vertex_add_modal_proxy_placeholder')}
-              value={form.proxyUrl ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, proxyUrl: e.target.value }))}
-              disabled={disableControls || saving}
-            />
-            <HeaderInputList
-              entries={form.headers}
-              onChange={(entries) => setForm((prev) => ({ ...prev, headers: entries }))}
-              addLabel={t('common.custom_headers_add')}
-              keyPlaceholder={t('common.custom_headers_key_placeholder')}
-              valuePlaceholder={t('common.custom_headers_value_placeholder')}
-              removeButtonTitle={t('common.delete')}
-              removeButtonAriaLabel={t('common.delete')}
-              disabled={disableControls || saving}
-            />
-            <div className="form-group">
-              <label>{t('ai_providers.vertex_models_label')}</label>
-              <ModelInputList
-                entries={form.modelEntries}
-                onChange={(entries) => setForm((prev) => ({ ...prev, modelEntries: entries }))}
-                addLabel={t('ai_providers.vertex_models_add_btn')}
-                namePlaceholder={t('common.model_name_placeholder')}
-                aliasPlaceholder={t('common.model_alias_placeholder')}
+            {!isGroupEdit && (
+              <Input
+                label={t('ai_providers.vertex_add_modal_key_label')}
+                placeholder={t('ai_providers.vertex_add_modal_key_placeholder')}
+                value={form.apiKey}
+                onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
+                disabled={disableControls || saving}
+              />
+            )}
+            {!isGroupEdit && (
+              <Input
+                label={t('ai_providers.prefix_label')}
+                placeholder={t('ai_providers.prefix_placeholder')}
+                value={form.prefix ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))}
+                hint={t('ai_providers.prefix_hint')}
+                disabled={disableControls || saving}
+              />
+            )}
+            {!keyOnly && (
+              <Input
+                label={t('ai_providers.vertex_add_modal_url_label')}
+                placeholder={t('ai_providers.vertex_add_modal_url_placeholder')}
+                value={form.baseUrl ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                disabled={disableControls || saving}
+              />
+            )}
+            {!keyOnly && (
+              <Input
+                label={t('ai_providers.vertex_add_modal_proxy_label')}
+                placeholder={t('ai_providers.vertex_add_modal_proxy_placeholder')}
+                value={form.proxyUrl ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, proxyUrl: e.target.value }))}
+                disabled={disableControls || saving}
+              />
+            )}
+            {!keyOnly && (
+              <HeaderInputList
+                entries={form.headers}
+                onChange={(entries) => setForm((prev) => ({ ...prev, headers: entries }))}
+                addLabel={t('common.custom_headers_add')}
+                keyPlaceholder={t('common.custom_headers_key_placeholder')}
+                valuePlaceholder={t('common.custom_headers_value_placeholder')}
                 removeButtonTitle={t('common.delete')}
                 removeButtonAriaLabel={t('common.delete')}
                 disabled={disableControls || saving}
               />
-              <div className="hint">{t('ai_providers.vertex_models_hint')}</div>
-            </div>
+            )}
+            {!keyOnly && (
+              <div className="form-group">
+                <label>{t('ai_providers.vertex_models_label')}</label>
+                <ModelInputList
+                  entries={form.modelEntries}
+                  onChange={(entries) => setForm((prev) => ({ ...prev, modelEntries: entries }))}
+                  addLabel={t('ai_providers.vertex_models_add_btn')}
+                  namePlaceholder={t('common.model_name_placeholder')}
+                  aliasPlaceholder={t('common.model_alias_placeholder')}
+                  removeButtonTitle={t('common.delete')}
+                  removeButtonAriaLabel={t('common.delete')}
+                  disabled={disableControls || saving}
+                />
+                <div className="hint">{t('ai_providers.vertex_models_hint')}</div>
+              </div>
+            )}
           </>
         )}
       </Card>
